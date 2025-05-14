@@ -127,6 +127,162 @@
 
             Assert.Equal("Failure:ErrValue", output);
         }
+
+        [Fact]
+        public async Task MapAsync_TaskResultOfSuccess_ShouldMapValue()
+        {
+            Task<Result<int, string>> resultTask = Task.FromResult(Result<int, string>.Success(10));
+
+            var mapped = await resultTask.MapAsync(async i =>
+            {
+                await Task.Delay(10);
+                return i * 2;
+            });
+
+            Assert.True(mapped.IsSuccess);
+            Assert.Equal(20, mapped.Value);
+        }
+
+        [Fact]
+        public async Task MapAsync_TaskResultOfFailure_ShouldPreserveError()
+        {
+            Task<Result<int, string>> resultTask = Task.FromResult(Result<int, string>.Failure("Erro"));
+
+            var mapped = await resultTask.MapAsync(async i =>
+            {
+                await Task.Delay(10);
+                return i * 2;
+            });
+
+            Assert.False(mapped.IsSuccess);
+            Assert.Equal("Erro", mapped.Error);
+        }
+
+        [Fact]
+        public async Task BindAsync_TaskResultOfSuccess_ShouldReturnNewResult()
+        {
+            Task<Result<int, string>> resultTask = Task.FromResult(Result<int, string>.Success(5));
+
+            var bound = await resultTask.BindAsync(async i =>
+            {
+                await Task.Delay(10);
+                return Result<string, string>.Success($"Valor: {i}");
+            });
+
+            Assert.True(bound.IsSuccess);
+            Assert.Equal("Valor: 5", bound.Value);
+        }
+
+        [Fact]
+        public async Task BindAsync_TaskResultOfFailure_ShouldReturnSameError()
+        {
+            Task<Result<int, string>> resultTask = Task.FromResult(Result<int, string>.Failure("Erro original"));
+
+            var bound = await resultTask.BindAsync(async i =>
+            {
+                await Task.Delay(10);
+                return Result<string, string>.Success($"Valor: {i}");
+            });
+
+            Assert.False(bound.IsSuccess);
+            Assert.Equal("Erro original", bound.Error);
+        }
+
+        [Fact]
+        public async Task MapErrorAsync_TaskResultOfFailure_ShouldMapError()
+        {
+            Task<Result<int, string>> resultTask = Task.FromResult(Result<int, string>.Failure("ERRO"));
+
+            var mappedError = await resultTask.MapErrorAsync(async err =>
+            {
+                await Task.Delay(10);
+                return $"Mapped: {err}";
+            });
+
+            Assert.False(mappedError.IsSuccess);
+            Assert.Equal("Mapped: ERRO", mappedError.Error);
+        }
+
+        [Fact]
+        public async Task MapErrorAsync_TaskResultOfSuccess_ShouldPreserveValue()
+        {
+            Task<Result<int, string>> resultTask = Task.FromResult(Result<int, string>.Success(99));
+
+            var mappedError = await resultTask.MapErrorAsync(async err =>
+            {
+                await Task.Delay(10);
+                return $"Mapped: {err}";
+            });
+
+            Assert.True(mappedError.IsSuccess);
+            Assert.Equal(99, mappedError.Value);
+        }
+
+        [Fact]
+        public async Task MatchAsync_TaskResultOfSuccess_ExecutesSuccessAsyncBranch()
+        {
+            Task<Result<int, string>> resultTask = Task.FromResult(Result<int, string>.Success(7));
+
+            var output = await resultTask.MatchAsync(
+                async value =>
+                {
+                    await Task.Delay(10);
+                    return $"Sucesso: {value}";
+                },
+                error => $"Erro: {error}"
+            );
+
+            Assert.Equal("Sucesso: 7", output);
+        }
+
+        [Fact]
+        public async Task MatchAsync_TaskResultOfFailure_ExecutesFailureSyncBranch()
+        {
+            Task<Result<int, string>> resultTask = Task.FromResult(Result<int, string>.Failure("Falha"));
+
+            var output = await resultTask.MatchAsync(
+                async value =>
+                {
+                    await Task.Delay(10);
+                    return $"Sucesso: {value}";
+                },
+                error => $"Erro: {error}"
+            );
+
+            Assert.Equal("Erro: Falha", output);
+        }
+
+        [Fact]
+        public async Task MatchAsync_TaskResultOfSuccess_ExecutesSuccessSyncBranch()
+        {
+            Task<Result<int, string>> resultTask = Task.FromResult(Result<int, string>.Success(42));
+
+            var output = await resultTask.MatchAsync(
+                value => $"Sync Sucesso: {value}",
+                async error =>
+                {
+                    await Task.Delay(10);
+                    return $"Async Erro: {error}";
+                });
+
+            Assert.Equal("Sync Sucesso: 42", output);
+        }
+
+        [Fact]
+        public async Task MatchAsync_TaskResultOfFailure_ExecutesFailureAsyncBranch()
+        {
+            Task<Result<int, string>> resultTask = Task.FromResult(Result<int, string>.Failure("ErrorX"));
+
+            var output = await resultTask.MatchAsync(
+                value => $"Sync Sucesso: {value}",
+                async error =>
+                {
+                    await Task.Delay(10);
+                    return $"Async Erro: {error}";
+                });
+
+            Assert.Equal("Async Erro: ErrorX", output);
+        }
     }
 
 }
